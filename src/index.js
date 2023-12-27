@@ -1,11 +1,21 @@
-// require('dotenv').config({path:"./env"})
-
+dotenv.config({ path: "./env" });
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 
-dotenv.config({ path: "./env" });
+connectDB()
+  .then(() => {
+    app.listen(process.env.PORT || 3000, () => {
+      console.log(`server running on port ${process.env.PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.log(`mongoDB connection Failed !!`, err);
+  });
 
-connectDB();
+
+
+
+
 
 /* 
 
@@ -28,4 +38,3 @@ const app = express();
 })();
 
 */
-//MONGODB_URI = mongosh "mongodb+srv://cluster0.mnav6t4.mongodb.net/" --apiVersion 1 --username prajwalthete
