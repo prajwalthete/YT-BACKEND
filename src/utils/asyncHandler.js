@@ -13,14 +13,16 @@ If the requestHandler function resolves successfully, the promise returned by Pr
 If there's an error thrown within the requestHandler function, the promise is rejected, and the catch block is executed. The catch block calls the next function with the err parameter, which passes the error to the next error-handling middleware.
 */
 
-/*
 // const asyncHandler = (fn) => {() => {}};
 
-const asyncHandler = (fn) => async (req, res, next) => {
-  try {
-    await fn(req, res, next);
-  } catch (error) {
-    res.status(err.code || 500).json({ sucess: true, message: error.message });
-  }
-};
-*/
+// const asyncHandler = (fn) => async (req, res, next) => {
+//   try {
+//     await fn(req, res, next);
+//   } catch (error) {
+//     res
+//       .status(error.code || 500)
+//       .json({ success: false, message: error.message });
+//   }
+// };
+
+// export { asyncHandler };

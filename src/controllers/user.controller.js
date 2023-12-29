@@ -23,7 +23,16 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const { fullname, email, username, password } = req.body;
 
-  console.log("email", email);
+  // console.log(
+  //   "fullname",
+  //   fullname,
+  //   "email",
+  //   email,
+  //   "username",
+  //   username,
+  //   "password",
+  //   password
+  // );
 
   if (
     [fullname, email, username, password].some((field) => field?.trim() === "")
@@ -31,16 +40,29 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields must be filled");
   }
 
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
 
   if (existedUser) {
     throw new ApiError(409, "User with username,email already exists");
   }
+  // console.log(req.files);
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  const coverImageLocalPath = req.files?.coverImage?.[0]?.path || undefined;
+
+  /*
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0]?.path;
+  }
+*/
 
   if (!avatarLocalPath) {
     throw new ApiError(404, "avatar file is required");
@@ -48,10 +70,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // upload them to cloudinary ,avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
+  // console.log("avatarLocalPath:", avatarLocalPath);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   // check for avatar
-  
   if (!avatar) {
     throw new ApiError(404, "avatar file is required");
   }
@@ -67,9 +89,19 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   // remove password and refreshToken fields from user object i.e response
-  const createdUser = await findById(user._id).select(
-    "-password -refreshToken"
-  );
+  // const createdUser = await findById(user._id).select(
+  //   "-password -refreshToken"
+  // );
+
+  const createdUser = await User.findOne({ _id: user._id }).lean();
+  // Remove sensitive fields
+  delete createdUser.password;
+  delete createdUser.refreshToken;
+
+  /*
+  if you're using Mongoose, you can use the lean() function to get a plain JavaScript object instead of a Mongoose document. This way, you can modify the object without affecting the database.
+  lean() is used to retrieve a plain JavaScript object, and then the delete operator is used to remove the password and refreshToken fields.
+ */
 
   // check for user creation
 

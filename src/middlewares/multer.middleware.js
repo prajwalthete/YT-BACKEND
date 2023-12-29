@@ -5,8 +5,10 @@ const storage = multer.diskStorage({
     cb(null, "./public/temp");
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname); // not good idea to keep origanl name
+    cb(null, file.originalname); // not a good idea to keep the original name
   },
 });
 
 const upload = multer({ storage });
+
+export { upload };
