@@ -4,45 +4,32 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+// Function to generate access and refresh tokens based on user ID
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
+    // Find the user by ID
     const user = await User.findById(userId);
 
+    // Generate access and refresh tokens
     const accessToken = user.genrateAccessToken();
     const refreshToken = user.genrateRefreshToken();
 
+    // Save the refresh token to the user document
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
+
+    // Return the generated tokens
     return { accessToken, refreshToken };
   } catch (error) {
+    // Handle any errors during token generation
     throw new ApiError(
       500,
-      "something went wrong while genrating access and refresh token "
-    );
-  }
-};
-/*
-const generateAccessAndRefreshTokens = async (userId) => {
-  try {
-    const user = await User.findOne({ _id: userId });
-
-    const accessToken = user.genrateAccessToken();
-    const refreshToken = user.genrateRefreshToken();
-
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false });
-    return { accessToken, refreshToken };
-  } catch (error) {
-    throw new ApiError(
-      500,
-      "something went wrong while generating access and refresh token"
+      "Something went wrong while generating access and refresh token"
     );
   }
 };
 
-
-*/
-// Define a registration handler using asyncHandler
+// Registration handler using asyncHandler
 const registerUser = asyncHandler(async (req, res) => {
   // Extract user details from the request body
   const { fullname, email, username, password } = req.body;
@@ -114,203 +101,84 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User registered successfully"));
 });
 
+// Login handler using asyncHandler
 const loginUser = asyncHandler(async (req, res) => {
-  // req body- get data
-  // username or email
-  // find user by username or email
-  // password check
-  // access token or refresh token
-  // send cookies
-
+  // Get data from the request body
   const { email, username, password } = req.body;
 
-  if (!username || !email) {
-    throw new ApiError(403, "username or email is required");
+  // Check if either username or email is provided
+  if (!username && !email) {
+    throw new ApiError(403, "Username or email is required");
   }
 
+  // Find user by username or email
   const user = await User.findOne({
     $or: [{ username }, { email }],
   });
 
+  // Check if the user exists
   if (!user) {
-    throw new ApiError(403, "user does not exist");
+    throw new ApiError(403, "User does not exist");
   }
 
+  // Check if the provided password is valid
   const isPasswordValid = await user.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
-    throw new ApiError(401, "invalid user credentials");
+    throw new ApiError(401, "Invalid user credentials");
   }
 
+  // Generate access and refresh tokens
   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     user._id
   );
 
+  // Retrieve the logged-in user as a plain JavaScript object
   const loggedInUser = await User.findOne({ _id: user._id }).lean();
+
   // Remove sensitive fields
-  delete createdUser.password;
-  delete createdUser.refreshToken;
+  delete loggedInUser.password;
+  delete loggedInUser.refreshToken;
 
   const option = {
     httpOnly: true,
     secure: true,
   };
 
+  // Send cookies and return the response
   return res
     .status(200)
     .cookie("accessToken", accessToken, option)
     .cookie("refreshToken", refreshToken, option)
-    .json(
-      new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }),
-      "User logged in successfully"
-    );
+    .json({
+      status: 200,
+      data: { user: loggedInUser, accessToken, refreshToken },
+      message: "User logged in successfully",
+      success: true,
+    });
 });
 
+// Logout handler using asyncHandler
 const logoutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate(req.user._id),
-    {
-      $set: {
-        refreshToken: undefined,
-      },
+  // Update the user document to remove the refresh token
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      refreshToken: undefined,
     },
-    {
-      new: true,
-    };
+  });
 
   const option = {
     httpOnly: true,
     secure: true,
   };
 
+  // Clear cookies and return the response
   return res
     .status(200)
     .clearCookie("accessToken", option)
     .clearCookie("refreshToken", option)
-    .json(new ApiResponse(200, {}, " User logged out successfully"));
+    .json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
+// Export registration, login, and logout handlers
 export { registerUser, loginUser, logoutUser };
-
-/*
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiErrors.js";
-import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-
-// const registerUser = asyncHandler(async (req, res) => {
-//   res.status(200).json({
-//     message: "ok",
-//   });
-// });
-
-const registerUser = asyncHandler(async (req, res) => {
-  // get user details from frontend
-  // check if user already is registered :username ,email
-  // validation
-  // check for images and avatar
-  // upload them to cloudinary ,avatar
-  // create user object-create entry in db
-  // remove password and refreshToken fields from user object i.e response
-  // check for user creation
-  // return res
-
-  const { fullname, email, username, password } = req.body;
-
-  // console.log(
-  //   "fullname",
-  //   fullname,
-  //   "email",
-  //   email,
-  //   "username",
-  //   username,
-  //   "password",
-  //   password
-  // );
-
-  if (
-    [fullname, email, username, password].some((field) => field?.trim() === "")
-  ) {
-    throw new ApiError(400, "All fields must be filled");
-  }
-
-  const existedUser = await User.findOne({
-    $or: [{ username }, { email }],
-  });
-
-  if (existedUser) {
-    throw new ApiError(409, "User with username,email already exists");
-  }
-  // console.log(req.files);
-
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage?.[0]?.path || undefined;
-
-  
-  // let coverImageLocalPath;
-  // if (
-  //   req.files &&
-  //   Array.isArray(req.files.coverImage) &&
-  //   req.files.coverImage.length > 0
-  // ) {
-  //   coverImageLocalPath = req.files.coverImage[0]?.path;
-  // }
-
-
-  if (!avatarLocalPath) {
-    throw new ApiError(404, "avatar file is required");
-  }
-
-  // upload them to cloudinary ,avatar
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
-  // console.log("avatarLocalPath:", avatarLocalPath);
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-
-  // check for avatar
-  if (!avatar) {
-    throw new ApiError(404, "avatar file is required");
-  }
-
-  // create user object-create entry in db
-  const user = await User.create({
-    fullname,
-    avatar: avatar.url,
-    coverImage: coverImage?.url || "",
-    email,
-    password,
-    username: username.toLowerCase(),
-  });
-
-  // remove password and refreshToken fields from user object i.e response
-  // const createdUser = await findById(user._id).select(
-  //   "-password -refreshToken"
-  // );
-
-  const createdUser = await User.findOne({ _id: user._id }).lean();
-  // Remove sensitive fields
-  delete createdUser.password;
-  delete createdUser.refreshToken;
-
-  
-  //if you're using Mongoose, you can use the lean() function to get a plain JavaScript object instead of a Mongoose document. This way, you can modify the object without affecting the database.
-  //lean() is used to retrieve a plain JavaScript object, and then the delete operator is used to remove the password and refreshToken fields.
- 
-
-  // check for user creation
-
-  if (!createdUser) {
-    throw new ApiError(
-      500,
-      "somthing went wrong while creating/registering  a new user"
-    );
-  }
-
-  // return response object
-  return res
-    .status(201)
-    .json(new ApiResponse(200, createdUser, "user registered successfully"));
-});
-
-export { registerUser };
-*/
