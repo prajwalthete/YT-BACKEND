@@ -181,33 +181,48 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
+// Middleware to refresh the access token using a valid refresh token
 const refreshAccessToken = asyncHandler(async (req, res) => {
+  // Get the incoming refresh token from cookies or request body
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
+
+  // Check if a refresh token is provided
   if (!incomingRefreshToken) {
-    throw new ApiError(401, "unauthorized request");
+    throw new ApiError(401, "Unauthorized request");
   }
+
   try {
+    // Verify the incoming refresh token
     const decodedToken = jwt.verify(
       incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET
     );
+
+    // Find the user associated with the refresh token
     const user = await User.findById(decodedToken?._id);
+
+    // Check if the user exists
     if (!user) {
-      throw new ApiError(401, "invald refresh token ");
-    }
-    if (incomingRefreshToken !== user.refreshToken) {
-      throw new ApiError(401, "refresh token is already used or expired");
+      throw new ApiError(401, "Invalid refresh token");
     }
 
+    // Check if the incoming refresh token matches the user's refresh token
+    if (incomingRefreshToken !== user.refreshToken) {
+      throw new ApiError(401, "Refresh token is already used or expired");
+    }
+
+    // Set options for the new access and refresh tokens
     const option = {
       httpOnly: true,
       secure: true,
     };
 
+    // Generate new access and refresh tokens
     const { accessToken, newRefreshToken } =
       await generateAccessAndRefreshTokens(user._id);
 
+    // Return the response with new tokens and success message
     return res
       .status(200)
       .cookie("accessToken", accessToken, option)
@@ -215,11 +230,12 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       .json({
         status: 200,
         data: { accessToken, newRefreshToken },
-        message: "accessToken Refreshed  successfully",
+        message: "Access token refreshed successfully",
         success: true,
       });
   } catch (error) {
-    throw new ApiError(201, error?.message || "invalid refresh token");
+    // Handle token verification errors
+    throw new ApiError(201, error?.message || "Invalid refresh token");
   }
 });
 
