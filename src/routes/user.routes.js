@@ -39,7 +39,7 @@ router.patch("/avatar", verifyJWT, upload.single("avatar"), updateUserAvatar);
 router.patch(
   "/cover-image",
   verifyJWT,
-  upload.single("/coverImage"),
+  upload.single("coverImage"),
   updateUserCoverImage
 );
 router.get("/c/:username", verifyJWT, getUserChannelProfile);

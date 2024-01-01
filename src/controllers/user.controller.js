@@ -263,9 +263,8 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullname, email } = req.body;
-  if (!fullname || !email) {
-    throw new ApiError(404, " All fields are required");
-  }
+  if (!fullname || !email) throw new ApiError(404, " All fields are required");
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -330,15 +329,22 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "coverImageupdated successfully"));
 });
 
+// Define an asynchronous route handler using asyncHandler middleware
 const getUserChannelProfile = asyncHandler(async (req, res) => {
+  // Extract the 'username' parameter from the request parameters
   const { username } = req.params;
+
+  // Check if 'username' is missing or empty, and throw a 404 error if true
   if (!username?.trim()) throw new ApiError(404, "username is missing");
 
+  // Use the MongoDB Aggregation Framework to fetch user channel data
   const channel = await User.aggregate([
     {
+      // Stage 1: Match documents where the 'username' matches (case-insensitive)
       $match: { username: username?.toLowerCase() },
     },
     {
+      // Stage 2: Perform a lookup to get the list of subscribers for the user's channel
       $lookup: {
         from: "subscriptions",
         localField: "_id",
@@ -347,6 +353,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
       },
     },
     {
+      // Stage 3: Perform a lookup to get the list of channels the user is subscribed to
       $lookup: {
         from: "subscriptions",
         localField: "_id",
@@ -355,14 +362,17 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
       },
     },
     {
+      // Stage 4: Add new fields to the document, including counts and subscription status
       $addFields: {
+        // Count the number of subscribers for the user's channel
         subscribersCount: {
           $size: "$subscribers",
         },
+        // Count the number of channels the user is subscribed to
         channelsSubscribedToCount: {
-          $size: "subscribedTo",
+          $size: "$subscribedTo",
         },
-
+        // Check if the requesting user is subscribed to the channel
         isSubscribed: {
           $cond: {
             if: { $in: [req.user?._id, "$subscribers.subscriber"] },
@@ -373,34 +383,95 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
       },
     },
     {
+      // Stage 5: Project only the desired fields for the response
       $project: {
         fullname: 1,
         username: 1,
         subscribersCount: 1,
         channelsSubscribedToCount: 1,
         isSubscribed: 1,
-        avatra: 1,
+        avatar: 1,
         coverImage: 1,
         email: 1,
       },
     },
   ]);
 
-  if (!channel?.length) throw new ApiError(404, "channel not found ");
+  // Check if the channel data is not found, and throw a 404 error if true
+  if (!channel?.length) throw new ApiError(404, "channel not found");
 
+  // Respond with a JSON containing the channel data and success message
   return res
     .status(200)
-    .json(
-      200,
-      new ApiResponse(channel[0], "user channel fetched successfully")
-    );
+    .json(new ApiResponse(channel[0], "user channel fetched successfully"));
 });
 
+/*
+// from sirs video
 const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
         _id: new mongoose.Types.ObjectId(),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "watchHistory fetched successfully "
+      )
+    );
+});
+*/
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  //you are using new mongoose.Types.ObjectId(),in previus method  which creates a new, empty ObjectId.
+  //To fix this, you should use the actual user ID for the match stage. Assuming you want to fetch the watch history
+  //for the currently authenticated user (req.user._id), you can modify the $match stage as follows:
+
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: req.user._id, // Use the actual user ID here
       },
     },
     {
