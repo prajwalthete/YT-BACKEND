@@ -163,11 +163,17 @@ const loginUser = asyncHandler(async (req, res) => {
 // Logout handler using asyncHandler
 const logoutUser = asyncHandler(async (req, res) => {
   // Update the user document to remove the refresh token
-  await User.findByIdAndUpdate(req.user._id, {
-    $set: {
-      refreshToken: undefined,
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $unset: {
+        refreshToken: 1, // this remove the field from document
+      },
     },
-  });
+    {
+      new: true,
+    }
+  );
 
   const option = {
     httpOnly: true,
